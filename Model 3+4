@@ -6,14 +6,14 @@ g=9.81 #
 rho=1.225
 CdA=0.35
 Crr=0.005
-P_crit=394.0
-E_ana_max=20000.0
+P_crit=394.0 # power the rider can hold without tiring
+E_ana_max=20000.0 # recovery rate
 eta=0.5
 P_targets=[390, 380, 390, 405, 420, 405, 387, 380, 380, 380
-           ]
+           ] 'Needs to be changed when we find our actual values'
            
 
-gradients_precent=[2,4,6,8,10,8,6,4,2,0]
+gradients_precent=[2,4,6,8,10,8,6,4,2,0] 'Needs to be changed when we find our actual values'
 thetas=[math.atan(g/100.0)for g in gradients_precent]
 distances=[1000.0]*10
 
