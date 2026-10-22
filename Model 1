@@ -1,0 +1,113 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Newton's Law
+m dv/dt = F_0 - m g sin(theta) - k v
+# Velocity in terms of t
+v(t) = v_term + (v_0 - v_term) e^(-kt/m)            (integrating factor)
+# Displacement in terms of t
+x(t) = v_term t + (m/k)(v_0 - v_term)(1 - e^(-kt/m))  (integrate v)
+ 
+F_0 = 100          # constant driving force (N) - must be > m g sin(theta)
+m = 80             # total mass of rider + bike (kg)
+g = 9.81           # gravity (m/s^2)
+theta_deg = 5      # slope angle (degrees)
+theta = np.radians(theta_deg)
+v_0 = 1            # starting speed (m/s)
+k = 5              # linear drag coefficient (N s/m)
+L = 9000           # length of the climb (m)  (was s = 9, assumed 9 km)
+E_0 = 1.0e6        # energy input available to the rider (J)
+ 
+# Non-velocity-dependent forces must be > 0, i.e. F_0 > m g sin(theta)
+F_non_v = F_0 - m * g * np.sin(theta)
+if F_non_v <= 0:
+    raise ValueError(f"F_0 must be bigger than m g sin(theta) = {m * g * np.sin(theta):.1f} N")
+ 
+v_term = F_non_v / k        # terminal velocity (m/s)
+ 
+ 
+def velocity(t):
+    return v_term + (v_0 - v_term) * np.exp(-k * t / m)
+ 
+def distance(t):
+    return v_term * t + (m / k) * (v_0 - v_term) * (1.0 - np.exp(-k * t / m))
+ 
+ 
+# ---------- Step 5: Newton-Raphson, T_new = T - f(T)/f'(T) ----------
+# Solve s(T) = L:  f(T) = s(T) - L, and f'(T) = ds/dT = v(T)
+for n in range(10):
+    f = s(T) - L               # we want s(T) = L, i.e. s(T) - L = 0
+    f_dash = velocity(T)
+    T = T - f / f_dash
+    print(f"Step {n + 1}:  T_{n + 1} = {T:.4f} s")
+ 
+ 
+# ---------- Energy output: E = integral of P dt, with P = F_0 v ----------
+# Add up P * dt over small time steps (a numerical integral)
+dt = 0.1
+E_out = 0
+t = 0
+while t < T:
+    P = F_0 * velocity(t)
+    E_out += P * dt
+    t += dt
+ 
+E_in = F_0 * L       
+ 
+ 
+# ---------- Results every 2 minutes ----------
+results = []
+for t in np.arange(0, T, 120):
+    results.append({
+        "Time(s)": round(t, 1),
+        "Speed(m/s)": round(velocity(t), 2),
+        "Distance(m)": round(distance(t), 1),
+        "Power(W)": round(F_0 * velocity(t), 1)
+    })
+results.append({
+    "Time(s)": round(T, 1),
+    "Speed(m/s)": round(velocity(T), 2),
+    "Distance(m)": round(distance(T), 1),
+    "Power(W)": round(F_0 * velocity(T), 1)
+})
+ 
+print("\nModel 1: Constant Force")
+print(f"{'Time(s)':<10}|{'Speed(m/s)':<12}|{'Distance(m)':<13}|{'Power(W)':<10}")
+print("-" * 48)
+for r in results:
+    print(
+        f"{r['Time(s)']:<10}|"
+        f"{r['Speed(m/s)']:<12}|"
+        f"{r['Distance(m)']:<13}|"
+        f"{r['Power(W)']:<10}"
+    )
+ 
+print(f"\nTerminal velocity: {v_term:.2f} m/s")
+print(f"Total Ascent Time: {T:.2f} seconds ({T / 60:.1f} min)")
+print(f"Energy output (sum of P dt): {E_out:.0f} J")
+print(f"Energy output (F_0 L):       {E_exact:.0f} J")
+print(f"Energy input E_0:            {E_0:.0f} J")
+print("Enough energy?", E_out <= E_0)
+ 
+ 
+# ---------- Plots ----------
+t_plot = np.linspace(0, T, 500)
+ 
+plt.figure(figsize=(8, 6))
+ 
+plt.subplot(2, 1, 1)
+plt.plot(t_plot, velocity(t_plot))
+plt.axhline(v_term, color="grey", linestyle=":", label="terminal velocity")
+plt.ylabel("velocity v (m/s)")
+plt.legend()
+ 
+plt.subplot(2, 1, 2)
+plt.plot(t_plot, distance(t_plot))
+plt.axhline(L, color="grey", linestyle=":", label="top of climb")
+plt.ylabel("distance x (m)")
+plt.xlabel("time t (s)")
+plt.legend()
+ 
+plt.tight_layout()
+plt.savefig("model1_team.png")
+plt.show()
