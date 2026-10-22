@@ -1,0 +1,201 @@
+import math
+from scipy.optimize import minimize
+
+m=75 #mass
+g=9.81 #
+rho=1.225
+CdA=0.35
+Crr=0.005
+P_crit=394.0
+E_ana_max=20000.0
+eta=0.5
+P_targets=[390, 380, 390, 405, 420, 405, 387, 380, 380, 380
+           ]
+           
+
+gradients_precent=[2,4,6,8,10,8,6,4,2,0]
+thetas=[math.atan(g/100.0)for g in gradients_precent]
+distances=[1000.0]*10
+
+def power_equation(v,theta,P):
+   F_gravity=m*g*math.sin(theta)
+   F_rolling=Crr*m*g*math.cos(theta)
+   F_drag=0.5*rho*CdA*v**2
+   return (F_gravity+F_rolling)*v+F_drag*v-P
+def solve_speed(theta,P):
+    low=0.1
+    high=100.0
+    if power_equation(high,theta,P)<0:
+       return high
+    for _ in range(100):
+        mid=(low+high)/2
+        if power_equation(mid,theta,P)<0:
+         low=mid
+        else:
+         high=mid
+    return(low+high)/2
+    
+
+
+E_ana=E_ana_max
+results=[]
+for i in range(10):
+    theta=thetas[i]
+    ds=distances[i]
+    v=solve_speed(theta,P_targets[i])
+    dt=ds/v
+    if P_targets[i]>P_crit:
+        E_ana-=(P_targets[i]-P_crit)*dt
+    else:
+        E_ana+=eta*(P_crit-P_targets[i])*dt
+        E_ana=min(E_ana,E_ana_max)
+    results.append({
+        "Segment":i+1,
+        "Gradient(%)":gradients_precent[i],
+        "Speed(m/s)":round(v,2),
+        "Time(s)":round(dt,1),
+        "E_ana(J)":round(E_ana,1)
+        })
+
+def simulate(P_targets):
+   E_ana=E_ana_max
+   total_time =0
+   energy_history=[]
+   for i in range(10):
+      theta=thetas[i]
+      ds=distances[i]
+      v=solve_speed(theta,P_targets[i])
+      dt=ds/v
+      total_time+=dt
+      if P_targets[i]>P_crit:
+         E_ana-=(P_targets[i]-P_crit)*dt
+      else :
+         E_ana+=eta*(P_crit-P_targets[i])*dt
+         E_ana=min(E_ana,E_ana_max)
+      energy_history.append(E_ana)
+   return total_time,energy_history
+
+test_time, test_energy = simulate([400] * 10)
+
+print("400 W test time:", test_time)
+print("400 W energy:", test_energy)
+print("400 W minimum energy:", min(test_energy))
+
+def objective(P_targets):
+   total_time,_=simulate(P_targets)
+   return total_time
+
+def energy_constraint(P_targets):
+   _,energy_histroy=simulate(P_targets)
+   return min(energy_histroy)
+
+initial_guess = [
+    400, 400, 400, 400, 400,
+    400, 400, 400, 400, 400
+]
+
+bounds=[(300,500)]*10
+constraint ={"type":"ineq","fun":energy_constraint}
+
+result=minimize(objective,initial_guess,method="SLSQP",bounds=bounds,constraints=constraint,options={"maxiter":2000,"ftol":1e-9,"disp":True})
+
+print("Success:",result.success)
+print("Best Power Allocation:",result.x)
+print("Best Ascent Time:",result.fun)
+print("Message:",result.message)
+
+print("\nManual Variable-Power Strategy")
+
+print(f"{'Segment':<8}|{'Gradient(%)':<12}|{'Speed(m/s)':<12}|{'Time(s)':<10}|{'E_ana(J)':<10}")
+print("-"*65)
+
+for r in results:
+    print(
+        f"{r['Segment']:<8}|"
+        f"{r['Gradient(%)']:<12}|"
+        f"{r['Speed(m/s)']:<12}|"
+        f"{r['Time(s)']:<10}|"
+        f"{r['E_ana(J)']:<10}"
+    )
+
+manual_time = sum(r["Time(s)"] for r in results)
+
+print(f"\nManual Total Ascent Time: {manual_time} seconds")
+
+
+best_power = result.x
+E_ana = E_ana_max
+optimized_results = []
+optimized_total_time = 0
+
+for i in range(10):
+
+    theta = thetas[i]
+    ds = distances[i]
+    P = best_power[i]
+
+    v = solve_speed(theta, P)
+    dt = ds / v
+
+    optimized_total_time += dt
+
+    if P > P_crit:
+        E_ana -= (P - P_crit) * dt
+    else:
+        E_ana += eta * (P_crit - P) * dt
+        E_ana = min(E_ana, E_ana_max)
+
+    optimized_results.append({
+        "Segment": i + 1,
+        "Gradient(%)": gradients_precent[i],
+        "Power(W)": round(P, 2),
+        "Speed(m/s)": round(v, 2),
+        "Time(s)": round(dt, 1),
+        "E_ana(J)": round(E_ana, 1)
+    })
+
+
+print("\nOptimized Strategy")
+
+print(
+    f"{'Segment':<8}|"
+    f"{'Gradient(%)':<12}|"
+    f"{'Power(W)':<10}|"
+    f"{'Speed(m/s)':<12}|"
+    f"{'Time(s)':<10}|"
+    f"{'E_ana(J)':<10}"
+)
+
+print("-"*75)
+
+for r in optimized_results:
+    print(
+        f"{r['Segment']:<8}|"
+        f"{r['Gradient(%)']:<12}|"
+        f"{r['Power(W)']:<10}|"
+        f"{r['Speed(m/s)']:<12}|"
+        f"{r['Time(s)']:<10}|"
+        f"{r['E_ana(J)']:<10}"
+    )
+
+print(f"\nOptimized Total Ascent Time: {optimized_total_time:.2f} seconds")
+
+print("\n400 W Baseline")
+print("Segment | Gradient(%) | Speed(m/s) | Time(s)")
+print("-" * 55)
+
+baseline_time = 0
+
+for i in range(10):
+    v = solve_speed(thetas[i], 400)
+    dt = distances[i] / v
+    baseline_time += dt
+
+    print(
+        i + 1,
+        gradients_precent[i],
+        round(v, 2),
+        round(dt, 1)
+    )
+
+print("400 W Baseline Total Time:", baseline_time)
