@@ -1,42 +1,48 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Newton's Law
-m dv/dt = F_0 - m g sin(theta) - k v
-# Velocity in terms of t
-v(t) = v_term + (v_0 - v_term) e^(-kt/m)            (integrating factor)
-# Displacement in terms of t
-x(t) = v_term t + (m/k)(v_0 - v_term)(1 - e^(-kt/m))  (integrate v)
- 
-F_0 = 100          # constant driving force (N) - must be > m g sin(theta)
+
+k = 1.1            # linear drag coefficient (N s/m)
+P= 442 
 m = 80             # total mass of rider + bike (kg)
 g = 9.81           # gravity (m/s^2)
 theta_deg = 5      # slope angle (degrees)
 theta = np.radians(theta_deg)
 v_0 = 1            # starting speed (m/s)
-k = 5              # linear drag coefficient (N s/m)
 L = 9000           # length of the climb (m)  (was s = 9, assumed 9 km)
 E_0 = 1.0e6        # energy input available to the rider (J)
- 
-# Non-velocity-dependent forces must be > 0, i.e. F_0 > m g sin(theta)
-F_non_v = F_0 - m * g * np.sin(theta)
-if F_non_v <= 0:
-    raise ValueError(f"F_0 must be bigger than m g sin(theta) = {m * g * np.sin(theta):.1f} N")
- 
-v_term = F_non_v / k        # terminal velocity (m/s)
- 
+A = m*g*np.sin(theta)
+v_T = (-A + np.sqrt(A**2 + 4 * k * P)) / (2 * k)   # quadratic formula
+F_0 = P / v_T            # constant driving force (N) - must be > m g sin(theta)
+
+'''
+Newton's Law
+m*dv/dt = F_0 - m*g*sin(theta) - k v
+Velocity in terms of t
+v(t) = v_term + (v_0 - v_term) e^(-k*t/m)            (integrating factor)
+ Displacement in terms of t
+x(t) = v_term*t + (m/k)(v_0 - v_term)(1 - e^(-k*t/m))  (integrate v)
+'''
  
 def velocity(t):
     return v_term + (v_0 - v_term) * np.exp(-k * t / m)
  
 def distance(t):
     return v_term * t + (m / k) * (v_0 - v_term) * (1.0 - np.exp(-k * t / m))
- 
+
+# Non-velocity-dependent forces must be > 0, i.e. F_0 > m g sin(theta)
+F_non_v = F_0 - m * g * np.sin(theta)
+if F_non_v <= 0:
+    raise ValueError(f"F_0 must be bigger than m g sin(theta) = {m * g * np.sin(theta):.1f} N")
+v_term = F_non_v / k        # terminal velocity (m/s)
+
  
 # ---------- Step 5: Newton-Raphson, T_new = T - f(T)/f'(T) ----------
 # Solve s(T) = L:  f(T) = s(T) - L, and f'(T) = ds/dT = v(T)
-for n in range(10):
-    f = s(T) - L               # we want s(T) = L, i.e. s(T) - L = 0
+
+T=1000
+for n in range(5):
+    f = distance(T) - L               # we want s(T) = L, i.e. s(T) - L = 0
     f_dash = velocity(T)
     T = T - f / f_dash
     print(f"Step {n + 1}:  T_{n + 1} = {T:.4f} s")
@@ -52,7 +58,7 @@ while t < T:
     E_out += P * dt
     t += dt
  
-E_in = F_0 * L       
+E_exact = F_0 * L       
  
  
 # ---------- Results every 2 minutes ----------
@@ -109,5 +115,4 @@ plt.xlabel("time t (s)")
 plt.legend()
  
 plt.tight_layout()
-plt.savefig("model1_team.png")
 plt.show()
